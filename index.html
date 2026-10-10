@@ -124,21 +124,6 @@
   .sub { margin-top: 8px; color: var(--text-soft); font-size: 14px; }
   .sub b { color: var(--text); font-weight: 600; }
 
-  .calibrate { margin-top: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .cal-btn {
-    border: 1px solid var(--accent);
-    background: var(--accent); color: #fff;
-    border-radius: 10px; padding: 10px 16px; font-size: 14px; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 8px;
-    transition: transform .15s ease, opacity .2s ease;
-  }
-  .cal-btn:hover { transform: translateY(-1px); }
-  .cal-btn:active { transform: translateY(0); }
-  .cal-btn:disabled { opacity: .6; cursor: default; transform: none; }
-  .cal-status { font-size: 13px; color: var(--text-soft); }
-  .cal-status.ok { color: var(--good); }
-  .cal-status.err { color: var(--warn); }
-
   footer {
     width: 100%; max-width: 960px; margin-top: 22px;
     font-size: 12px; color: var(--text-soft); text-align: center; line-height: 1.7;
@@ -166,10 +151,6 @@
       <div class="label"><span class="dot"></span>北京时间（UTC+8）</div>
       <div class="time-big" id="bjTime">--:--<span class="time-sec" id="bjSec">:--</span></div>
       <div class="sub" id="bjDate">加载中…</div>
-      <div class="calibrate">
-        <button class="cal-btn" id="calBtn" type="button">🔄 一键校准时间</button>
-        <span class="cal-status" id="calStatus"></span>
-      </div>
     </section>
 
     <!-- 设备时间 -->
@@ -181,7 +162,7 @@
   </main>
 
   <footer>
-    北京时间默认自动联网校准（每 10 分钟同步并缓存），授时源依次为 timeapi.io → worldtimeapi.org → 淘宝授时，因此不受本机时钟误差影响；也可点「北京时间」卡片下的「一键校准时间」手动刷新。<br />
+    北京时间默认自动联网校准（每 10 分钟同步并缓存），授时源依次为 timeapi.io → worldtimeapi.org → 淘宝授时，因此不受本机时钟误差影响。<br />
     北京与石家庄均位于东八区，<b>标准时差为 0</b>；若两地显示不同，通常是设备所在时区设置不同所致。
   </footer>
 
@@ -249,13 +230,6 @@
   var devTime = document.getElementById("devTime");
   var devSec = document.getElementById("devSec");
   var devDate = document.getElementById("devDate");
-  var calBtn = document.getElementById("calBtn");
-  var calStatus = document.getElementById("calStatus");
-
-  function setCalStatus(msg, type) {
-    calStatus.textContent = msg;
-    calStatus.className = "cal-status" + (type ? " " + type : "");
-  }
 
   function render() {
     var nowEpoch = Date.now();
@@ -313,7 +287,7 @@
     tryTimeapi();
   }
 
-  function applyNetworkTime(realBJ, manual, src) {
+  function applyNetworkTime(realBJ) {
     netBase = realBJ.getTime();
     syncLocal = Date.now();
     try {
@@ -321,37 +295,22 @@
       localStorage.setItem("bjtime-sync", String(syncLocal));
     } catch (e) {}
     render();
-    var diffSec = Math.round((netBase - syncLocal) / 1000);
-    var sign = diffSec < 0 ? -1 : 1;
-    var abs = Math.abs(diffSec);
-    var m = sign * Math.floor(abs / 60);
-    var s = sign * (abs % 60);
-    var absTxt = (Math.abs(m) ? Math.abs(m) + "分" : "") + (Math.abs(s) ? Math.abs(s) + "秒" : "") || "0秒";
-    setCalStatus((manual ? "已校准" : "已自动同步") + "（" + (src || "网络") + "）：设备时钟约" + (diffSec >= 0 ? "慢 " : "快 ") + absTxt, "ok");
   }
 
-  function syncFromNetwork(manual) {
-    setCalStatus(manual ? "正在校准…" : "正在同步网络时间…");
-    fetchRealBeijing(function (err, realBJ, src) {
-      calBtn.disabled = false;
+  function syncFromNetwork() {
+    fetchRealBeijing(function (err, realBJ) {
       if (err || !realBJ) {
-        if (netBase == null) setCalStatus("无法获取网络时间，已用本机时钟（可能不准）", "err");
-        else setCalStatus("同步失败，仍使用上次网络时间", "err");
+        if (netBase == null) console.warn("无法获取网络时间，已用本机时钟（可能不准）");
         return;
       }
-      applyNetworkTime(realBJ, manual, src);
+      applyNetworkTime(realBJ);
     });
   }
 
-  calBtn.addEventListener("click", function () {
-    calBtn.disabled = true;
-    syncFromNetwork(true);
-  });
-
   // 立即渲染；自动联网同步一次，之后每 10 分钟重新同步
   render();
-  syncFromNetwork(false);
-  setInterval(function () { syncFromNetwork(false); }, 10 * 60 * 1000);
+  syncFromNetwork();
+  setInterval(syncFromNetwork, 10 * 60 * 1000);
 
   function align() {
     var delay = 1000 - (Date.now() % 1000);

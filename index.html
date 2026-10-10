@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>北京时间 · 设备时间对照</title>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --bg-grad: radial-gradient(1200px 600px at 50% -10%, #e8eefc 0%, #f4f6fb 55%);
+    --card: #ffffff;
+    --card-border: #e6e9f2;
+    --text: #1b2330;
+    --text-soft: #5b6675;
+    --accent: #2f6bff;
+    --accent-soft: #eaf0ff;
+    --shadow: 0 10px 30px rgba(31, 45, 80, 0.08);
+    --good: #1a9d5a;
+    --warn: #d97706;
+  }
+  body.dark {
+    --bg: #0e1320;
+    --bg-grad: radial-gradient(1200px 600px at 50% -10%, #1a2440 0%, #0e1320 55%);
+    --card: #161d2e;
+    --card-border: #26304a;
+    --text: #eef2fb;
+    --text-soft: #9aa6bd;
+    --accent: #5b8cff;
+    --accent-soft: #1b2742;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    --good: #43c98a;
+    --warn: #f0a84b;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: var(--bg);
+    background-image: var(--bg-grad);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    transition: background-color .35s ease, color .35s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: clamp(16px, 4vw, 40px) clamp(12px, 4vw, 32px) 28px;
+  }
+
+  header {
+    width: 100%;
+    max-width: 960px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: clamp(18px, 4vw, 28px);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .logo {
+    width: 42px; height: 42px; border-radius: 12px; flex: none;
+    background: linear-gradient(135deg, var(--accent), #7aa2ff);
+    display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 18px;
+    box-shadow: var(--shadow);
+  }
+  .brand h1 { font-size: clamp(16px, 4vw, 20px); margin: 0; line-height: 1.2; }
+  .brand p { margin: 2px 0 0; font-size: 12px; color: var(--text-soft); }
+
+  .theme-toggle {
+    flex: none;
+    border: 1px solid var(--card-border);
+    background: var(--card);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 9px 14px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+    box-shadow: var(--shadow);
+    transition: transform .15s ease, background-color .3s ease;
+  }
+  .theme-toggle:hover { transform: translateY(-1px); }
+  .theme-toggle:active { transform: translateY(0); }
+
+  main {
+    width: 100%;
+    max-width: 960px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: clamp(12px, 2.5vw, 20px);
+  }
+  @media (max-width: 640px) {
+    main { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    padding: clamp(16px, 3vw, 24px);
+    box-shadow: var(--shadow);
+  }
+  .card.span-2 { grid-column: 1 / -1; }
+
+  .card .label {
+    font-size: 13px; color: var(--text-soft);
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+
+  .time-big {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: clamp(34px, 11vw, 64px);
+    line-height: 1.05;
+    letter-spacing: 1px;
+  }
+  .time-sec {
+    font-size: .5em; color: var(--accent);
+    font-weight: 700; margin-left: 4px;
+  }
+  .sub { margin-top: 8px; color: var(--text-soft); font-size: 14px; }
+  .sub b { color: var(--text); font-weight: 600; }
+
+  .diff-value {
+    font-size: clamp(28px, 8vw, 44px);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .badge {
+    display: inline-block; margin-top: 10px;
+    padding: 4px 10px; border-radius: 999px; font-size: 12px;
+    background: var(--accent-soft); color: var(--accent); font-weight: 600;
+  }
+
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12px; color: var(--text-soft); }
+  .field input {
+    width: 130px; padding: 10px 12px; font-size: 16px;
+    border: 1px solid var(--card-border); border-radius: 10px;
+    background: var(--bg); color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .field input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  .hint { font-size: 12px; color: var(--text-soft); margin-top: 10px; line-height: 1.6; }
+  .hint code {
+    background: var(--accent-soft); color: var(--accent);
+    padding: 1px 6px; border-radius: 6px; font-size: 12px;
+  }
+
+  footer {
+    width: 100%; max-width: 960px; margin-top: 22px;
+    font-size: 12px; color: var(--text-soft); text-align: center; line-height: 1.7;
+  }
+  footer b { color: var(--text); }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo">京</div>
+      <div>
+        <h1>北京时间 · 设备时间对照</h1>
+        <p>UTC+8 东八区 · 精确到秒 · 多端自适应</p>
+      </div>
+    </div>
+    <button class="theme-toggle" id="themeBtn" aria-label="切换日夜间模式">
+      <span id="themeIcon">🌙</span><span id="themeText">夜间</span>
+    </button>
+  </header>
+
+  <main>
+    <!-- 北京时间 -->
+    <section class="card">
+      <div class="label"><span class="dot"></span>北京时间（UTC+8）</div>
+      <div class="time-big" id="bjTime">--:--<span class="time-sec" id="bjSec">:--</span></div>
+      <div class="sub" id="bjDate">加载中…</div>
+    </section>
+
+    <!-- 设备时间 -->
+    <section class="card">
+      <div class="label"><span class="dot"></span>当前设备时间</div>
+      <div class="time-big" id="devTime">--:--<span class="time-sec" id="devSec">:--</span></div>
+      <div class="sub" id="devDate">加载中…</div>
+    </section>
+
+    <!-- 差异 -->
+    <section class="card span-2">
+      <div class="label"><span class="dot"></span>设备时间 与 北京时间 的时差</div>
+      <div class="diff-value" id="diffValue">+0 小时 0 分 0 秒</div>
+      <div class="badge" id="diffBadge">设备与北京同区</div>
+    </section>
+
+    <!-- 手动校正输入 -->
+    <section class="card span-2">
+      <div class="label"><span class="dot"></span>输入「设备与北京/石家庄」的校正差异</div>
+      <div class="row">
+        <div class="field">
+          <label for="offsetMin">分钟（可为负，例如 -8）</label>
+          <input id="offsetMin" type="number" step="1" value="0" inputmode="numeric" />
+        </div>
+        <div class="field">
+          <label for="offsetSec">秒（可为负，例如 -30）</label>
+          <input id="offsetSec" type="number" step="1" value="0" inputmode="numeric" />
+        </div>
+      </div>
+      <div class="hint">
+        若你的设备时钟不准，可在此输入已知偏差，下方「校正后北京时间」会实时修正。<br />
+        <b>说明：</b>北京与石家庄同属<b>东八区（UTC+8）</b>，两地<b>时差为 0</b>；此处「差异」指<b>你的设备时钟</b>相对北京标准时间的偏差。
+      </div>
+      <div class="label" style="margin-top:16px;"><span class="dot"></span>校正后北京时间</div>
+      <div class="time-big" id="bjCorrected">--:--<span class="time-sec" id="bjCorrectedSec">:--</span></div>
+      <div class="sub" id="bjCorrectedDate"></div>
+    </section>
+  </main>
+
+  <footer>
+    北京时间依据你的设备时钟换算为东八区（UTC+8）显示，精确到秒。<br />
+    北京与石家庄均位于东八区，<b>标准时差为 0</b>；若两地显示不同，通常是设备所在时区设置不同所致。
+  </footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var BEIJING_OFFSET = 8 * 60; // 东八区，单位：分钟
+
+  // ---- 主题切换 ----
+  var themeBtn = document.getElementById("themeBtn");
+  var themeIcon = document.getElementById("themeIcon");
+  var themeText = document.getElementById("themeText");
+
+  function applyTheme(dark) {
+    document.body.classList.toggle("dark", dark);
+    themeIcon.textContent = dark ? "☀️" : "🌙";
+    themeText.textContent = dark ? "日间" : "夜间";
+    try { localStorage.setItem("bjtime-theme", dark ? "dark" : "light"); } catch (e) {}
+  }
+  var saved = null;
+  try { saved = localStorage.getItem("bjtime-theme"); } catch (e) {}
+  var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  applyTheme(saved ? saved === "dark" : prefersDark);
+  themeBtn.addEventListener("click", function () {
+    applyTheme(!document.body.classList.contains("dark"));
+  });
+
+  // ---- 工具函数 ----
+  var WEEK = ["星期日","星期一","星期二","星期三","星期四","星期五","星期六"];
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+
+  // 将任意 Date（本地时间对象）换算为东八区时间
+  function toBeijing(date) {
+    var utc = date.getTime() + date.getTimezoneOffset() * 60000;
+    return new Date(utc + BEIJING_OFFSET * 60000);
+  }
+
+  function fmtTime(d) {
+    return pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+  function fmtSec(d) { return ":" + pad(d.getSeconds()); }
+  function fmtDate(d) {
+    return d.getFullYear() + "年" + (d.getMonth() + 1) + "月" + d.getDate() + "日 · " + WEEK[d.getDay()];
+  }
+
+  // ---- DOM ----
+  var bjTime = document.getElementById("bjTime");
+  var bjSec = document.getElementById("bjSec");
+  var bjDate = document.getElementById("bjDate");
+  var devTime = document.getElementById("devTime");
+  var devSec = document.getElementById("devSec");
+  var devDate = document.getElementById("devDate");
+  var diffValue = document.getElementById("diffValue");
+  var diffBadge = document.getElementById("diffBadge");
+  var offsetMin = document.getElementById("offsetMin");
+  var offsetSec = document.getElementById("offsetSec");
+  var bjCorrected = document.getElementById("bjCorrected");
+  var bjCorrectedSec = document.getElementById("bjCorrectedSec");
+  var bjCorrectedDate = document.getElementById("bjCorrectedDate");
+
+  function getManualOffsetMs() {
+    var m = parseFloat(offsetMin.value) || 0;
+    var s = parseFloat(offsetSec.value) || 0;
+    return (m * 60 + s) * 1000;
+  }
+
+  function render() {
+    var now = new Date();
+
+    // 北京时间（基于设备时钟换算）
+    var bj = toBeijing(now);
+    bjTime.firstChild.nodeValue = fmtTime(bj);
+    bjSec.textContent = fmtSec(bj);
+    bjDate.innerHTML = fmtDate(bj) + " · <b>UTC+8</b>";
+
+    // 设备本地时间
+    devTime.firstChild.nodeValue = fmtTime(now);
+    devSec.textContent = fmtSec(now);
+    var tzName = (Intl.DateTimeFormat().resolvedOptions().timeZone) || "未知";
+    devDate.innerHTML = fmtDate(now) + " · 时区 <b>" + tzName + "</b>";
+
+    // 设备与北京的时差（由同一时刻换算，体现设备时区与东八区的差）
+    var diffMs = bj.getTime() - now.getTime();
+    var sign = diffMs >= 0 ? "+" : "-";
+    var abs = Math.abs(Math.round(diffMs / 1000));
+    var dh = Math.floor(abs / 3600);
+    var dm = Math.floor((abs % 3600) / 60);
+    var ds = abs % 60;
+    diffValue.textContent = sign + dh + " 小时 " + dm + " 分 " + ds + " 秒";
+    if (dh === 0 && dm === 0 && ds === 0) {
+      diffBadge.textContent = "设备与北京同区（UTC+8）";
+    } else {
+      diffBadge.textContent = "设备时区与东八区不同";
+    }
+
+    // 校正后北京时间
+    var corrected = new Date(bj.getTime() + getManualOffsetMs());
+    bjCorrected.firstChild.nodeValue = fmtTime(corrected);
+    bjCorrectedSec.textContent = fmtSec(corrected);
+    bjCorrectedDate.innerHTML = fmtDate(corrected) + " · 已应用手动校正";
+  }
+
+  offsetMin.addEventListener("input", render);
+  offsetSec.addEventListener("input", render);
+
+  // 立即渲染并对齐到整秒，避免跳动
+  render();
+  function align() {
+    var delay = 1000 - (Date.now() % 1000);
+    setTimeout(function () {
+      render();
+      setInterval(render, 1000);
+    }, delay);
+  }
+  align();
+})();
+</script>
+</body>
+</html>

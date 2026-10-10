@@ -313,19 +313,26 @@
   function fetchRealBeijing(cb) {
     var done = false;
     function finish(err, d) { if (!done) { done = true; cb(err, d); } }
-    fetch("https://worldtimeapi.org/api/timezone/Asia/Shanghai")
-      .then(function (r) { if (!r.ok) throw new Error("wt"); return r.json(); })
-      .then(function (d) { finish(null, new Date(d.unixtime * 1000)); })
-      .catch(function () {
-        fetch("https://timeapi.io/api/time/current/zone?timeZone=Asia/Shanghai")
-          .then(function (r) { if (!r.ok) throw new Error("ta"); return r.json(); })
-          .then(function (d) {
-            var p = String(d.dateTime).split(/[-T:.]/);
-            var ms = Date.UTC(+p[0], +p[1] - 1, +p[2], +p[3], +p[4], +p[5], +(p[6] || 0));
-            finish(null, new Date(ms + 8 * 3600 * 1000));
-          })
-          .catch(function () { finish(new Error("net")); });
-      });
+
+    // 主用：timeapi.io（国内可达性好），返回的 dateTime 为上海本地时间，补上 +08:00 再解析为绝对时刻
+    function tryTimeapi() {
+      fetch("https://timeapi.io/api/time/current/zone?timeZone=Asia/Shanghai")
+        .then(function (r) { if (!r.ok) throw new Error("ta"); return r.json(); })
+        .then(function (d) {
+          var iso = String(d.dateTime);
+          if (!/[Zz]$|[+-]\d{2}:?\d{2}$/.test(iso)) iso += "+08:00";
+          finish(null, new Date(iso));
+        })
+        .catch(function () { tryWorldtime(); });
+    }
+    // 备用：worldtimeapi（unixtime 为标准 UTC 秒，直接转绝对时刻）
+    function tryWorldtime() {
+      fetch("https://worldtimeapi.org/api/timezone/Asia/Shanghai")
+        .then(function (r) { if (!r.ok) throw new Error("wt"); return r.json(); })
+        .then(function (d) { finish(null, new Date(d.unixtime * 1000)); })
+        .catch(function () { finish(new Error("net")); });
+    }
+    tryTimeapi();
   }
 
   function applyNetworkTime(realBJ, manual) {

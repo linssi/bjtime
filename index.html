@@ -125,7 +125,7 @@
   .sub b { color: var(--text); font-weight: 600; }
 
   /* 万年历 */
-  .almanac { display: flex; align-items: center; gap: clamp(16px, 4vw, 36px); flex-wrap: wrap; }
+  .almanac { display: flex; align-items: flex-start; gap: clamp(16px, 4vw, 36px); flex-wrap: wrap; }
   .alm-main {
     display: flex; flex-direction: column; align-items: center; min-width: 104px;
     padding-right: clamp(16px, 4vw, 36px);
@@ -146,8 +146,70 @@
     background: var(--accent-soft); color: var(--accent); font-weight: 600;
   }
   .alm-tag.fest { background: rgba(217, 119, 6, .16); color: var(--warn); }
+  .alm-tag.jc {
+    background: transparent; border: 1px solid var(--card-border);
+    color: var(--text-soft); font-weight: 500;
+  }
+
+  /* 宜忌 */
+  .alm-yiji { display: flex; flex-direction: column; gap: 7px; margin-top: 2px; }
+  .yiji-row { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; line-height: 1.55; }
+  .yiji-key {
+    flex: none; width: 22px; height: 22px; border-radius: 6px;
+    display: grid; place-items: center; font-size: 12px; font-weight: 700; color: #fff;
+  }
+  .yiji-key.yi { background: var(--good); }
+  .yiji-key.ji { background: var(--warn); }
+  .yiji-txt { color: var(--text-soft); }
+  .alm-chong { font-size: 12px; color: var(--text-soft); }
+
+  /* 月历表格 */
+  .alm-cal { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--card-border); }
+  .alm-cal-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .alm-cal-title { font-size: 15px; font-weight: 600; min-width: 106px; text-align: center; }
+  .alm-nav {
+    width: 30px; height: 30px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--card-border); background: var(--bg); color: var(--text);
+    font-size: 16px; line-height: 1; display: grid; place-items: center;
+    transition: border-color .15s ease, color .15s ease;
+  }
+  .alm-nav:hover { border-color: var(--accent); color: var(--accent); }
+  .alm-today-btn {
+    margin-left: auto; font-size: 12px; padding: 6px 13px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--card-border); background: var(--bg); color: var(--text-soft);
+    transition: border-color .15s ease, color .15s ease;
+  }
+  .alm-today-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .alm-week, .alm-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .alm-week { margin-bottom: 6px; }
+  .alm-week span { text-align: center; font-size: 12px; color: var(--text-soft); padding: 3px 0; }
+  .alm-cell {
+    border: 1px solid transparent; border-radius: 10px; padding: 6px 2px; cursor: pointer;
+    background: transparent; font-family: inherit; color: var(--text); min-width: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    transition: background-color .15s ease, border-color .15s ease;
+  }
+  .alm-cell:hover { background: var(--accent-soft); }
+  .alm-cell .c-d { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .alm-cell .c-l {
+    font-size: 11px; color: var(--text-soft); line-height: 1.2;
+    max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .alm-cell.out { opacity: .35; }
+  .alm-cell.fest .c-l { color: var(--warn); font-weight: 600; }
+  .alm-cell.today { border-color: var(--accent); background: var(--accent-soft); }
+  .alm-cell.sel { background: var(--accent); border-color: var(--accent); }
+  .alm-cell.sel .c-d, .alm-cell.sel .c-l { color: #fff; }
+
+  /* 节气倒计时 */
+  .alm-cd { margin-top: 14px; font-size: 13px; color: var(--text-soft); }
+  .alm-cd b { color: var(--accent); font-size: 15px; }
+
   @media (max-width: 640px) {
     .alm-main { border-right: none; padding-right: 0; }
+    .alm-cal-title { min-width: 0; }
+    .alm-cell { padding: 5px 1px; }
+    .alm-cell .c-l { font-size: 10px; }
   }
 
   footer {
@@ -198,8 +260,26 @@
           <div class="alm-row" id="almGanzhi">--</div>
           <div class="alm-row alm-soft" id="almSolar">--</div>
           <div class="alm-tags" id="almTags"></div>
+          <div class="alm-yiji">
+            <div class="yiji-row"><span class="yiji-key yi">宜</span><span class="yiji-txt" id="almYi">--</span></div>
+            <div class="yiji-row"><span class="yiji-key ji">忌</span><span class="yiji-txt" id="almJi">--</span></div>
+          </div>
+          <div class="alm-chong" id="almChong"></div>
         </div>
       </div>
+
+      <div class="alm-cal">
+        <div class="alm-cal-head">
+          <button type="button" class="alm-nav" id="almPrev" aria-label="上个月">‹</button>
+          <div class="alm-cal-title" id="almCalTitle">--</div>
+          <button type="button" class="alm-nav" id="almNext" aria-label="下个月">›</button>
+          <button type="button" class="alm-today-btn" id="almTodayBtn">回到今天</button>
+        </div>
+        <div class="alm-week"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+        <div class="alm-grid" id="almGrid"></div>
+      </div>
+
+      <div class="alm-cd" id="almCountdown"></div>
     </section>
   </main>
 
@@ -359,37 +439,83 @@
     return Gan[idx % 10] + Zhi[idx % 12];
   }
 
+  // 建除十二神（依节气月建 + 日支推算）对应的宜忌（传统历法简化，仅供参考）
+  var JianChu = ["建","除","满","平","定","执","破","危","成","收","开","闭"];
+  var JC_YI = {
+    "建":"祭祀、祈福、出行、赴任、订盟","除":"除服、疗病、解除、扫舍、祭祀",
+    "满":"祭祀、祈福、开市、造屋、纳财","平":"嫁娶、修饰垣墙、平治道涂、祭祀",
+    "定":"祭祀、订盟、纳采、嫁娶、安床","执":"嫁娶、造屋、捕捉、结网、纳畜",
+    "破":"破屋、求医、治病、解除","危":"安床、祭祀、祈福、伐木",
+    "成":"嫁娶、开市、入学、立契、动土、安床","收":"纳财、捕捉、进人口、开仓、纳畜",
+    "开":"祭祀、祈福、开市、入学、动土、出行","闭":"筑堤、造仓、安葬、修补、塞穴"
+  };
+  var JC_JI = {
+    "建":"动土、破土、掘井、开仓","除":"出行、嫁娶、求财、开市",
+    "满":"服药、栽种、安葬、下葬","平":"栽种、开渠、掘井、破土",
+    "定":"诉讼、出行、移徙、破土","执":"开市、出行、移徙、安葬",
+    "破":"嫁娶、开市、动土、签约、上任","危":"登高、行船、出行、移徙",
+    "成":"诉讼、栽种、安葬","收":"开市、出行、安葬、破土",
+    "开":"安葬、放水、破土","闭":"开市、出行、求医、动土"
+  };
+  // 各月起始节气序号（小寒→丑月、立春→寅月 …）及其对应月支序号
+  var M_START = [0,2,4,6,8,10,12,14,16,18,20,22];
+  var M_ZHI = [1,2,3,4,5,6,7,8,9,10,11,0];
+
+  function dayZhiIdx(y, m, d) {
+    var days = Math.floor((Date.UTC(y, m - 1, d) - Date.UTC(1900, 0, 1)) / 86400000);
+    return (((days + 10) % 60 + 60) % 60) % 12;
+  }
+  // 节气月支（以当月节气日为界，未到则该月仍属上一月支）
+  function monthZhiIdx(y, m, d) {
+    if (d >= getTerm(y, M_START[m - 1])) return M_ZHI[m - 1];
+    return M_ZHI[(m === 1 ? 12 : m - 1) - 1];
+  }
+  function termEpoch(y, n) {
+    return new Date((31556925974.7 * (y - 1900) + sTermInfo[n] * 60000) + Date.UTC(1900, 0, 6, 2, 5)).getTime();
+  }
+  function parseKey(k) { var a = k.split("-"); return { y: +a[0], m: +a[1], d: +a[2] }; }
+
   var almDay = document.getElementById("almDay");
   var almMonth = document.getElementById("almMonth");
   var almGanzhi = document.getElementById("almGanzhi");
   var almSolar = document.getElementById("almSolar");
   var almTags = document.getElementById("almTags");
-  var lastAlmKey = "";
+  var almYi = document.getElementById("almYi");
+  var almJi = document.getElementById("almJi");
+  var almChong = document.getElementById("almChong");
+  var almCountdown = document.getElementById("almCountdown");
+  var almCalTitle = document.getElementById("almCalTitle");
+  var almGrid = document.getElementById("almGrid");
+  var almPrev = document.getElementById("almPrev");
+  var almNext = document.getElementById("almNext");
+  var almTodayBtn = document.getElementById("almTodayBtn");
+  var lastAlmKey = "", lastCdKey = "";
+  var selKey = null;                 // 选中日期 "y-m-d"，null 表示今天
+  var calViewY = null, calViewM = null;
 
-  function updateCalendar(bjEpoch) {
-    var bj = bjParts(bjEpoch);
-    var y = bj.Y, m = bj.Mo + 1, d = bj.D;
-    var key = y + "-" + m + "-" + d;
-    if (key === lastAlmKey) return;   // 同一天不重复计算
-    lastAlmKey = key;
-
+  // 渲染某一天的农历/干支/宜忌详情
+  function renderDetail(y, m, d) {
     var lu = solar2lunar(y, m, d);
-    var mName = (lu.isLeap ? "闰" : "") + lMonthName[lu.lMonth - 1] + "月";
     var gzYear = Gan[(lu.lYear - 4) % 10] + Zhi[(lu.lYear - 4) % 12];
     var animal = Animals[(lu.lYear - 4) % 12];
+    var w = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    var isToday = (selKey === null) || (selKey === y + "-" + m + "-" + d);
 
     almDay.textContent = cDay(lu.lDay);
-    almMonth.textContent = mName;
+    almMonth.textContent = (lu.isLeap ? "闰" : "") + lMonthName[lu.lMonth - 1] + "月";
     almGanzhi.innerHTML = gzYear + "年 · 属" + animal + " · <b>" + dayGZ(y, m, d) + "日</b>";
-    almSolar.textContent = "公历 " + y + "年" + m + "月" + d + "日 · " + WEEK[bj.W];
+    almSolar.textContent = "公历 " + y + "年" + m + "月" + d + "日 · " + WEEK[w] + (isToday ? " · 今天" : "");
 
-    // 标签：节气 + 节日
+    // 标签：节气 + 节日 + 建除
     var tags = [];
     var term = termOfDay(y, m, d);
     if (term) tags.push({ t: term, cls: "" });
     if (solarFest[m + "-" + d]) tags.push({ t: solarFest[m + "-" + d], cls: "fest" });
     if (!lu.isLeap && lunarFest[lu.lMonth + "-" + lu.lDay]) tags.push({ t: lunarFest[lu.lMonth + "-" + lu.lDay], cls: "fest" });
     if (!lu.isLeap && lu.lMonth === 12 && lu.lDay === lMonthDays(lu.lYear, 12)) tags.push({ t: "除夕", cls: "fest" });
+    var zi = dayZhiIdx(y, m, d), mi = monthZhiIdx(y, m, d);
+    var jc = JianChu[((zi - mi) % 12 + 12) % 12];
+    tags.push({ t: jc + "日", cls: "jc" });
 
     almTags.innerHTML = "";
     for (var i = 0; i < tags.length; i++) {
@@ -398,8 +524,107 @@
       sp.textContent = tags[i].t;
       almTags.appendChild(sp);
     }
-    almTags.style.display = tags.length ? "flex" : "none";
+    // 宜忌 + 冲煞
+    almYi.textContent = JC_YI[jc];
+    almJi.textContent = JC_JI[jc];
+    almChong.textContent = "冲" + Animals[(zi + 6) % 12] + "（" + Zhi[zi] + "日冲" + Zhi[(zi + 6) % 12] + "）";
   }
+
+  // 渲染当月月历表格（公历 + 农历对照）
+  function renderMonthGrid(todayK) {
+    almCalTitle.textContent = calViewY + "年" + (calViewM + 1) + "月";
+    var firstW = new Date(Date.UTC(calViewY, calViewM, 1)).getUTCDay();
+    var daysInMonth = new Date(Date.UTC(calViewY, calViewM + 1, 0)).getUTCDate();
+    var rows = Math.ceil((firstW + daysInMonth) / 7);
+    var base = Date.UTC(calViewY, calViewM, 1 - firstW);
+    var sel = selKey || todayK;
+    var html = "";
+    for (var i = 0; i < rows * 7; i++) {
+      var dt = new Date(base + i * 86400000);
+      var y = dt.getUTCFullYear(), m = dt.getUTCMonth() + 1, d = dt.getUTCDate();
+      var k = y + "-" + m + "-" + d;
+      var lu = solar2lunar(y, m, d);
+      var fest = solarFest[m + "-" + d] || (!lu.isLeap ? lunarFest[lu.lMonth + "-" + lu.lDay] : null);
+      var tm = termOfDay(y, m, d);
+      var label, isFest = false;
+      if (fest) { label = fest; isFest = true; }
+      else if (tm) { label = tm; isFest = true; }
+      else if (lu.lDay === 1) label = (lu.isLeap ? "闰" : "") + lMonthName[lu.lMonth - 1] + "月";
+      else label = cDay(lu.lDay);
+      var cls = "alm-cell";
+      if (m !== calViewM + 1) cls += " out";
+      if (k === todayK) cls += " today";
+      if (k === sel) cls += " sel";
+      if (isFest) cls += " fest";
+      html += '<button type="button" class="' + cls + '" data-k="' + k + '">' +
+              '<span class="c-d">' + d + '</span><span class="c-l">' + label + '</span></button>';
+    }
+    almGrid.innerHTML = html;
+  }
+
+  // 距离下一个节气的天数（按北京日期）
+  function updateCountdown(bjEpoch) {
+    var bj = bjParts(bjEpoch);
+    var key = bj.Y + "-" + bj.Mo + "-" + bj.D;
+    if (key === lastCdKey) return;
+    lastCdKey = key;
+    var todayStart = Date.UTC(bj.Y, bj.Mo, bj.D);
+    var best = null;
+    for (var yy = bj.Y; yy <= bj.Y + 1 && !best; yy++) {
+      for (var n = 0; n < 24; n++) {
+        // 与 getTerm 保持同一口径：直接取 UTC 日，即为该节气的北京日期
+        var tb = new Date(termEpoch(yy, n));
+        var ds = Date.UTC(tb.getUTCFullYear(), tb.getUTCMonth(), tb.getUTCDate());
+        if (ds >= todayStart && (!best || ds < best.ds)) {
+          best = { name: solarTerms[n], ds: ds, m: tb.getUTCMonth() + 1, d: tb.getUTCDate() };
+        }
+      }
+    }
+    if (!best) return;
+    var days = Math.round((best.ds - todayStart) / 86400000);
+    almCountdown.innerHTML = days === 0
+      ? "今日节气：<b>" + best.name + "</b>"
+      : "下一个节气：<b>" + best.name + "</b>（" + best.m + "月" + best.d + "日）· 还有 <b>" + days + "</b> 天";
+  }
+
+  function refreshAlmanac() {
+    lastAlmKey = "";
+    updateCalendar(currentBJEpoch());
+  }
+
+  function updateCalendar(bjEpoch) {
+    var bj = bjParts(bjEpoch);
+    var y = bj.Y, m = bj.Mo + 1, d = bj.D;
+    if (calViewY === null) { calViewY = y; calViewM = bj.Mo; }
+    var key = y + "-" + m + "-" + d + "|" + (selKey || "") + "|" + calViewY + "-" + calViewM;
+    if (key === lastAlmKey) return;   // 状态未变则不重复计算
+    lastAlmKey = key;
+    var t = selKey ? parseKey(selKey) : { y: y, m: m, d: d };
+    renderDetail(t.y, t.m, t.d);
+    renderMonthGrid(y + "-" + m + "-" + d);
+  }
+
+  function shiftMonth(delta) {
+    var mm = calViewM + delta, yy = calViewY;
+    if (mm < 0) { mm = 11; yy--; } else if (mm > 11) { mm = 0; yy++; }
+    calViewY = yy; calViewM = mm;
+    refreshAlmanac();
+  }
+  function goToday() {
+    var bj = bjParts(currentBJEpoch());
+    selKey = null; calViewY = bj.Y; calViewM = bj.Mo;
+    refreshAlmanac();
+  }
+  almPrev.addEventListener("click", function () { shiftMonth(-1); });
+  almNext.addEventListener("click", function () { shiftMonth(1); });
+  almTodayBtn.addEventListener("click", goToday);
+  almGrid.addEventListener("click", function (e) {
+    var el = e.target;
+    while (el && el !== almGrid && !el.getAttribute("data-k")) el = el.parentNode;
+    if (!el || el === almGrid) return;
+    selKey = el.getAttribute("data-k");
+    refreshAlmanac();
+  });
 
   function render() {
     var nowEpoch = Date.now();
@@ -418,8 +643,9 @@
     bjSec.textContent = fmtS(bj);
     bjDate.innerHTML = fmtDate(bj) + " · <b>UTC+8</b>";
 
-    // 万年历（农历/节气/节日），按北京日期更新
+    // 万年历（农历/节气/节日/宜忌）与节气倒计时，按北京日期更新
     updateCalendar(bjEpoch);
+    updateCountdown(bjEpoch);
   }
 
   // ---- 联网获取权威北京时间 ----

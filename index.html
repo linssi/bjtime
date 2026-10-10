@@ -124,17 +124,6 @@
   .sub { margin-top: 8px; color: var(--text-soft); font-size: 14px; }
   .sub b { color: var(--text); font-weight: 600; }
 
-  .diff-value {
-    font-size: clamp(28px, 8vw, 44px);
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-  }
-  .badge {
-    display: inline-block; margin-top: 10px;
-    padding: 4px 10px; border-radius: 999px; font-size: 12px;
-    background: var(--accent-soft); color: var(--accent); font-weight: 600;
-  }
-
   .calibrate { margin-top: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .cal-btn {
     border: 1px solid var(--accent);
@@ -177,6 +166,10 @@
       <div class="label"><span class="dot"></span>北京时间（UTC+8）</div>
       <div class="time-big" id="bjTime">--:--<span class="time-sec" id="bjSec">:--</span></div>
       <div class="sub" id="bjDate">加载中…</div>
+      <div class="calibrate">
+        <button class="cal-btn" id="calBtn" type="button">🔄 一键校准时间</button>
+        <span class="cal-status" id="calStatus"></span>
+      </div>
     </section>
 
     <!-- 设备时间 -->
@@ -185,21 +178,10 @@
       <div class="time-big" id="devTime">--:--<span class="time-sec" id="devSec">:--</span></div>
       <div class="sub" id="devDate">加载中…</div>
     </section>
-
-    <!-- 差异 -->
-    <section class="card span-2">
-      <div class="label"><span class="dot"></span>设备时间 与 北京时间 的时差</div>
-      <div class="diff-value" id="diffValue">+0 小时 0 分 0 秒</div>
-      <div class="badge" id="diffBadge">设备与北京同区</div>
-      <div class="calibrate">
-        <button class="cal-btn" id="calBtn" type="button">🔄 一键校准时间</button>
-        <span class="cal-status" id="calStatus"></span>
-      </div>
-    </section>
   </main>
 
   <footer>
-    北京时间默认自动联网校准（每 10 分钟同步一次，并缓存上次结果），因此不受本机时钟误差影响；也可点「一键校准时间」手动刷新。<br />
+    北京时间默认自动联网校准（每 10 分钟同步并缓存），授时源依次为 timeapi.io → worldtimeapi.org → 淘宝授时，因此不受本机时钟误差影响；也可点「北京时间」卡片下的「一键校准时间」手动刷新。<br />
     北京与石家庄均位于东八区，<b>标准时差为 0</b>；若两地显示不同，通常是设备所在时区设置不同所致。
   </footer>
 
@@ -267,8 +249,6 @@
   var devTime = document.getElementById("devTime");
   var devSec = document.getElementById("devSec");
   var devDate = document.getElementById("devDate");
-  var diffValue = document.getElementById("diffValue");
-  var diffBadge = document.getElementById("diffBadge");
   var calBtn = document.getElementById("calBtn");
   var calStatus = document.getElementById("calStatus");
 
@@ -293,35 +273,23 @@
     bjTime.firstChild.nodeValue = fmtHM(bj);
     bjSec.textContent = fmtS(bj);
     bjDate.innerHTML = fmtDate(bj) + " · <b>UTC+8</b>";
-
-    // 时差 = 北京时间(真实) - 设备时间；中国且本机准确时为 0
-    var diffMs = bjEpoch - nowEpoch;
-    var sign = diffMs >= 0 ? "+" : "-";
-    var abs = Math.abs(Math.round(diffMs / 1000));
-    var dh = Math.floor(abs / 3600);
-    var dm = Math.floor((abs % 3600) / 60);
-    var ds = abs % 60;
-    diffValue.textContent = sign + dh + " 小时 " + dm + " 分 " + ds + " 秒";
-    if (dh === 0 && dm === 0 && ds === 0) {
-      diffBadge.textContent = "设备与北京一致";
-    } else {
-      diffBadge.textContent = "设备与北京相差 " + sign + dh + "时" + dm + "分" + ds + "秒";
-    }
   }
 
   // ---- 联网获取权威北京时间 ----
+  // 授时源顺序：timeapi.io（主用）→ worldtimeapi.org（备用）→ 淘宝授时（国内兜底）
   function fetchRealBeijing(cb) {
     var done = false;
-    function finish(err, d) { if (!done) { done = true; cb(err, d); } }
+    function ok(date, src) { if (!done) { done = true; cb(null, date, src); } }
+    function fail() { if (!done) { done = true; cb(new Error("net")); } }
 
-    // 主用：timeapi.io（国内可达性好），返回的 dateTime 为上海本地时间，补上 +08:00 再解析为绝对时刻
+    // 主用：timeapi.io，返回的 dateTime 为上海本地时间，补上 +08:00 再解析为绝对时刻
     function tryTimeapi() {
       fetch("https://timeapi.io/api/time/current/zone?timeZone=Asia/Shanghai")
         .then(function (r) { if (!r.ok) throw new Error("ta"); return r.json(); })
         .then(function (d) {
           var iso = String(d.dateTime);
           if (!/[Zz]$|[+-]\d{2}:?\d{2}$/.test(iso)) iso += "+08:00";
-          finish(null, new Date(iso));
+          ok(new Date(iso), "timeapi.io");
         })
         .catch(function () { tryWorldtime(); });
     }
@@ -329,13 +297,23 @@
     function tryWorldtime() {
       fetch("https://worldtimeapi.org/api/timezone/Asia/Shanghai")
         .then(function (r) { if (!r.ok) throw new Error("wt"); return r.json(); })
-        .then(function (d) { finish(null, new Date(d.unixtime * 1000)); })
-        .catch(function () { finish(new Error("net")); });
+        .then(function (d) { ok(new Date(d.unixtime * 1000), "worldtimeapi"); })
+        .catch(function () { tryTaobao(); });
+    }
+    // 第三兜底（国内）：淘宝公开授时接口，返回 data.t 为毫秒级时间戳
+    function tryTaobao() {
+      fetch("https://api.m.taobao.com/rest/api3.do?api=mtop.common.getTimestamp")
+        .then(function (r) { if (!r.ok) throw new Error("tb"); return r.json(); })
+        .then(function (d) {
+          if (!d || !d.data || !d.data.t) throw new Error("tb-data");
+          ok(new Date(Number(d.data.t)), "淘宝授时");
+        })
+        .catch(function () { fail(); });
     }
     tryTimeapi();
   }
 
-  function applyNetworkTime(realBJ, manual) {
+  function applyNetworkTime(realBJ, manual, src) {
     netBase = realBJ.getTime();
     syncLocal = Date.now();
     try {
@@ -349,19 +327,19 @@
     var m = sign * Math.floor(abs / 60);
     var s = sign * (abs % 60);
     var absTxt = (Math.abs(m) ? Math.abs(m) + "分" : "") + (Math.abs(s) ? Math.abs(s) + "秒" : "") || "0秒";
-    setCalStatus((manual ? "已校准" : "已自动同步") + "：设备时钟约" + (diffSec >= 0 ? "慢 " : "快 ") + absTxt, "ok");
+    setCalStatus((manual ? "已校准" : "已自动同步") + "（" + (src || "网络") + "）：设备时钟约" + (diffSec >= 0 ? "慢 " : "快 ") + absTxt, "ok");
   }
 
   function syncFromNetwork(manual) {
     setCalStatus(manual ? "正在校准…" : "正在同步网络时间…");
-    fetchRealBeijing(function (err, realBJ) {
+    fetchRealBeijing(function (err, realBJ, src) {
       calBtn.disabled = false;
       if (err || !realBJ) {
         if (netBase == null) setCalStatus("无法获取网络时间，已用本机时钟（可能不准）", "err");
         else setCalStatus("同步失败，仍使用上次网络时间", "err");
         return;
       }
-      applyNetworkTime(realBJ, manual);
+      applyNetworkTime(realBJ, manual, src);
     });
   }
 

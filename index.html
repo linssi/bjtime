@@ -150,22 +150,6 @@
   .cal-status.ok { color: var(--good); }
   .cal-status.err { color: var(--warn); }
 
-  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
-  .field { display: flex; flex-direction: column; gap: 6px; }
-  .field label { font-size: 12px; color: var(--text-soft); }
-  .field input {
-    width: 130px; padding: 10px 12px; font-size: 16px;
-    border: 1px solid var(--card-border); border-radius: 10px;
-    background: var(--bg); color: var(--text);
-    font-variant-numeric: tabular-nums;
-  }
-  .field input:focus { outline: 2px solid var(--accent); border-color: transparent; }
-  .hint { font-size: 12px; color: var(--text-soft); margin-top: 10px; line-height: 1.6; }
-  .hint code {
-    background: var(--accent-soft); color: var(--accent);
-    padding: 1px 6px; border-radius: 6px; font-size: 12px;
-  }
-
   footer {
     width: 100%; max-width: 960px; margin-top: 22px;
     font-size: 12px; color: var(--text-soft); text-align: center; line-height: 1.7;
@@ -212,32 +196,10 @@
         <span class="cal-status" id="calStatus"></span>
       </div>
     </section>
-
-    <!-- 手动校正输入 -->
-    <section class="card span-2">
-      <div class="label"><span class="dot"></span>输入「设备与北京/石家庄」的校正差异</div>
-      <div class="row">
-        <div class="field">
-          <label for="offsetMin">分钟（可为负，例如 -8）</label>
-          <input id="offsetMin" type="number" step="1" value="0" inputmode="numeric" />
-        </div>
-        <div class="field">
-          <label for="offsetSec">秒（可为负，例如 -30）</label>
-          <input id="offsetSec" type="number" step="1" value="0" inputmode="numeric" />
-        </div>
-      </div>
-      <div class="hint">
-        若你的设备时钟不准，可在此输入已知偏差，下方「校正后北京时间」会实时修正。<br />
-        <b>说明：</b>北京与石家庄同属<b>东八区（UTC+8）</b>，两地<b>时差为 0</b>；此处「差异」指<b>你的设备时钟</b>相对北京标准时间的偏差。
-      </div>
-      <div class="label" style="margin-top:16px;"><span class="dot"></span>校正后北京时间</div>
-      <div class="time-big" id="bjCorrected">--:--<span class="time-sec" id="bjCorrectedSec">:--</span></div>
-      <div class="sub" id="bjCorrectedDate"></div>
-    </section>
   </main>
 
   <footer>
-    北京时间依据你的设备时钟换算为东八区（UTC+8）显示，精确到秒。<br />
+    北京时间依据你的设备时钟换算为东八区（UTC+8）显示，精确到秒；点击「一键校准时间」可联网校正设备时钟偏差。<br />
     北京与石家庄均位于东八区，<b>标准时差为 0</b>；若两地显示不同，通常是设备所在时区设置不同所致。
   </footer>
 
@@ -293,32 +255,23 @@
   var devDate = document.getElementById("devDate");
   var diffValue = document.getElementById("diffValue");
   var diffBadge = document.getElementById("diffBadge");
-  var offsetMin = document.getElementById("offsetMin");
-  var offsetSec = document.getElementById("offsetSec");
-  var bjCorrected = document.getElementById("bjCorrected");
-  var bjCorrectedSec = document.getElementById("bjCorrectedSec");
-  var bjCorrectedDate = document.getElementById("bjCorrectedDate");
-
-  function getManualOffsetMs() {
-    var m = parseFloat(offsetMin.value) || 0;
-    var s = parseFloat(offsetSec.value) || 0;
-    return (m * 60 + s) * 1000;
-  }
+  var calibrationOffsetMs = 0; // 一键校准后叠加到北京时间的偏移（毫秒）
 
   function render() {
     var now = new Date();
-
-    // 北京时间（基于设备时钟换算）
-    var bj = toBeijing(now);
-    bjTime.firstChild.nodeValue = fmtTime(bj);
-    bjSec.textContent = fmtSec(bj);
-    bjDate.innerHTML = fmtDate(bj) + " · <b>UTC+8</b>";
 
     // 设备本地时间
     devTime.firstChild.nodeValue = fmtTime(now);
     devSec.textContent = fmtSec(now);
     var tzName = (Intl.DateTimeFormat().resolvedOptions().timeZone) || "未知";
     devDate.innerHTML = fmtDate(now) + " · 时区 <b>" + tzName + "</b>";
+
+    // 北京时间（基于设备时钟换算，叠加一键校准偏移）
+    var bj = toBeijing(now);
+    var bjShown = new Date(bj.getTime() + calibrationOffsetMs);
+    bjTime.firstChild.nodeValue = fmtTime(bjShown);
+    bjSec.textContent = fmtSec(bjShown);
+    bjDate.innerHTML = fmtDate(bjShown) + " · <b>UTC+8</b>";
 
     // 设备与北京的时差（由同一时刻换算，体现设备时区与东八区的差）
     var diffMs = bj.getTime() - now.getTime();
@@ -333,12 +286,6 @@
     } else {
       diffBadge.textContent = "设备时区与东八区不同";
     }
-
-    // 校正后北京时间
-    var corrected = new Date(bj.getTime() + getManualOffsetMs());
-    bjCorrected.firstChild.nodeValue = fmtTime(corrected);
-    bjCorrectedSec.textContent = fmtSec(corrected);
-    bjCorrectedDate.innerHTML = fmtDate(corrected) + " · 已应用手动校正";
   }
 
   // ---- 一键校准：联网获取权威北京时间，自动填入设备偏差 ----
@@ -352,14 +299,13 @@
 
   function applyCalibration(realBJ) {
     var deviceBJ = toBeijing(new Date());
-    var diffSec = Math.round((realBJ.getTime() - deviceBJ.getTime()) / 1000);
+    calibrationOffsetMs = realBJ.getTime() - deviceBJ.getTime();
+    render();
+    var diffSec = Math.round(calibrationOffsetMs / 1000);
     var sign = diffSec < 0 ? -1 : 1;
     var abs = Math.abs(diffSec);
     var m = sign * Math.floor(abs / 60);
     var s = sign * (abs % 60);
-    offsetMin.value = String(m);
-    offsetSec.value = String(s);
-    render();
     var absTxt = (Math.abs(m) ? Math.abs(m) + "分" : "") + (Math.abs(s) ? Math.abs(s) + "秒" : "") || "0秒";
     setCalStatus("已校准：设备时钟约" + (diffSec >= 0 ? "慢 " : "快 ") + absTxt, "ok");
   }
@@ -396,9 +342,6 @@
       applyCalibration(realBJ);
     });
   });
-
-  offsetMin.addEventListener("input", render);
-  offsetSec.addEventListener("input", render);
 
   // 立即渲染并对齐到整秒，避免跳动
   render();

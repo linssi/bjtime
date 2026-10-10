@@ -199,15 +199,13 @@
   </main>
 
   <footer>
-    北京时间依据你的设备时钟换算为东八区（UTC+8）显示，精确到秒；点击「一键校准时间」可联网校正设备时钟偏差。<br />
+    北京时间默认自动联网校准（每 10 分钟同步一次，并缓存上次结果），因此不受本机时钟误差影响；也可点「一键校准时间」手动刷新。<br />
     北京与石家庄均位于东八区，<b>标准时差为 0</b>；若两地显示不同，通常是设备所在时区设置不同所致。
   </footer>
 
 <script>
 (function () {
   "use strict";
-
-  var BEIJING_OFFSET = 8 * 60; // 东八区，单位：分钟
 
   // ---- 主题切换 ----
   var themeBtn = document.getElementById("themeBtn");
@@ -228,22 +226,38 @@
     applyTheme(!document.body.classList.contains("dark"));
   });
 
-  // ---- 工具函数 ----
+  // ---- 时间分解 ----
   var WEEK = ["星期日","星期一","星期二","星期三","星期四","星期五","星期六"];
   function pad(n) { return n < 10 ? "0" + n : "" + n; }
 
-  // 将任意 Date（本地时间对象）换算为东八区时间
-  function toBeijing(date) {
-    var utc = date.getTime() + date.getTimezoneOffset() * 60000;
-    return new Date(utc + BEIJING_OFFSET * 60000);
+  // 把「绝对时刻(UTC 毫秒)」拆成北京（UTC+8）墙钟；用 UTC 方法，不受设备时区影响
+  function bjParts(epochMs) {
+    var d = new Date(epochMs + 8 * 3600 * 1000);
+    return { H: d.getUTCHours(), M: d.getUTCMinutes(), S: d.getUTCSeconds(),
+             Y: d.getUTCFullYear(), Mo: d.getUTCMonth(), D: d.getUTCDate(), W: d.getUTCDay() };
   }
+  // 把「绝对时刻」拆成本地墙钟（用于设备时间）
+  function localParts(epochMs) {
+    var d = new Date(epochMs);
+    return { H: d.getHours(), M: d.getMinutes(), S: d.getSeconds(),
+             Y: d.getFullYear(), Mo: d.getMonth(), D: d.getDate(), W: d.getDay() };
+  }
+  function fmtHM(p) { return pad(p.H) + ":" + pad(p.M); }
+  function fmtS(p) { return ":" + pad(p.S); }
+  function fmtDate(p) { return p.Y + "年" + (p.Mo + 1) + "月" + p.D + "日 · " + WEEK[p.W]; }
 
-  function fmtTime(d) {
-    return pad(d.getHours()) + ":" + pad(d.getMinutes());
-  }
-  function fmtSec(d) { return ":" + pad(d.getSeconds()); }
-  function fmtDate(d) {
-    return d.getFullYear() + "年" + (d.getMonth() + 1) + "月" + d.getDate() + "日 · " + WEEK[d.getDay()];
+  // ---- 网络真实北京时间 ----
+  // netBase：联网取到的真实北京时间对应的绝对时刻；syncLocal：取数时本机 Date.now()
+  var netBase = null, syncLocal = 0;
+  try {
+    var cB = localStorage.getItem("bjtime-netbase");
+    var cS = localStorage.getItem("bjtime-sync");
+    if (cB != null && cS != null) { netBase = Number(cB); syncLocal = Number(cS); }
+  } catch (e) {}
+  // 当前北京时间绝对时刻：有网络值则按本机流逝时间续算（保持走秒），否则退回本机时钟
+  function currentBJEpoch() {
+    if (netBase == null) return Date.now();
+    return netBase + (Date.now() - syncLocal);
   }
 
   // ---- DOM ----
@@ -255,40 +269,6 @@
   var devDate = document.getElementById("devDate");
   var diffValue = document.getElementById("diffValue");
   var diffBadge = document.getElementById("diffBadge");
-  var calibrationOffsetMs = 0; // 一键校准后叠加到北京时间的偏移（毫秒）
-
-  function render() {
-    var now = new Date();
-
-    // 设备本地时间
-    devTime.firstChild.nodeValue = fmtTime(now);
-    devSec.textContent = fmtSec(now);
-    var tzName = (Intl.DateTimeFormat().resolvedOptions().timeZone) || "未知";
-    devDate.innerHTML = fmtDate(now) + " · 时区 <b>" + tzName + "</b>";
-
-    // 北京时间（基于设备时钟换算，叠加一键校准偏移）
-    var bj = toBeijing(now);
-    var bjShown = new Date(bj.getTime() + calibrationOffsetMs);
-    bjTime.firstChild.nodeValue = fmtTime(bjShown);
-    bjSec.textContent = fmtSec(bjShown);
-    bjDate.innerHTML = fmtDate(bjShown) + " · <b>UTC+8</b>";
-
-    // 设备与北京的时差（由同一时刻换算，体现设备时区与东八区的差）
-    var diffMs = bj.getTime() - now.getTime();
-    var sign = diffMs >= 0 ? "+" : "-";
-    var abs = Math.abs(Math.round(diffMs / 1000));
-    var dh = Math.floor(abs / 3600);
-    var dm = Math.floor((abs % 3600) / 60);
-    var ds = abs % 60;
-    diffValue.textContent = sign + dh + " 小时 " + dm + " 分 " + ds + " 秒";
-    if (dh === 0 && dm === 0 && ds === 0) {
-      diffBadge.textContent = "设备与北京同区（UTC+8）";
-    } else {
-      diffBadge.textContent = "设备时区与东八区不同";
-    }
-  }
-
-  // ---- 一键校准：联网获取权威北京时间，自动填入设备偏差 ----
   var calBtn = document.getElementById("calBtn");
   var calStatus = document.getElementById("calStatus");
 
@@ -297,28 +277,46 @@
     calStatus.className = "cal-status" + (type ? " " + type : "");
   }
 
-  function applyCalibration(realBJ) {
-    var deviceBJ = toBeijing(new Date());
-    calibrationOffsetMs = realBJ.getTime() - deviceBJ.getTime();
-    render();
-    var diffSec = Math.round(calibrationOffsetMs / 1000);
-    var sign = diffSec < 0 ? -1 : 1;
-    var abs = Math.abs(diffSec);
-    var m = sign * Math.floor(abs / 60);
-    var s = sign * (abs % 60);
-    var absTxt = (Math.abs(m) ? Math.abs(m) + "分" : "") + (Math.abs(s) ? Math.abs(s) + "秒" : "") || "0秒";
-    setCalStatus("已校准：设备时钟约" + (diffSec >= 0 ? "慢 " : "快 ") + absTxt, "ok");
+  function render() {
+    var nowEpoch = Date.now();
+
+    // 设备本地时间
+    var dev = localParts(nowEpoch);
+    devTime.firstChild.nodeValue = fmtHM(dev);
+    devSec.textContent = fmtS(dev);
+    var tzName = (Intl.DateTimeFormat().resolvedOptions().timeZone) || "未知";
+    devDate.innerHTML = fmtDate(dev) + " · 时区 <b>" + tzName + "</b>";
+
+    // 北京时间：默认使用联网真实时间（自动同步），无网络时退回本机时钟
+    var bjEpoch = currentBJEpoch();
+    var bj = bjParts(bjEpoch);
+    bjTime.firstChild.nodeValue = fmtHM(bj);
+    bjSec.textContent = fmtS(bj);
+    bjDate.innerHTML = fmtDate(bj) + " · <b>UTC+8</b>";
+
+    // 时差 = 北京时间(真实) - 设备时间；中国且本机准确时为 0
+    var diffMs = bjEpoch - nowEpoch;
+    var sign = diffMs >= 0 ? "+" : "-";
+    var abs = Math.abs(Math.round(diffMs / 1000));
+    var dh = Math.floor(abs / 3600);
+    var dm = Math.floor((abs % 3600) / 60);
+    var ds = abs % 60;
+    diffValue.textContent = sign + dh + " 小时 " + dm + " 分 " + ds + " 秒";
+    if (dh === 0 && dm === 0 && ds === 0) {
+      diffBadge.textContent = "设备与北京一致";
+    } else {
+      diffBadge.textContent = "设备与北京相差 " + sign + dh + "时" + dm + "分" + ds + "秒";
+    }
   }
 
+  // ---- 联网获取权威北京时间 ----
   function fetchRealBeijing(cb) {
     var done = false;
     function finish(err, d) { if (!done) { done = true; cb(err, d); } }
-    // 主用：worldtimeapi（返回 unixtime，UTC 秒）
     fetch("https://worldtimeapi.org/api/timezone/Asia/Shanghai")
       .then(function (r) { if (!r.ok) throw new Error("wt"); return r.json(); })
       .then(function (d) { finish(null, new Date(d.unixtime * 1000)); })
       .catch(function () {
-        // 备用：timeapi.io（返回上海本地各字段，转回真实 UTC 时刻）
         fetch("https://timeapi.io/api/time/current/zone?timeZone=Asia/Shanghai")
           .then(function (r) { if (!r.ok) throw new Error("ta"); return r.json(); })
           .then(function (d) {
@@ -330,21 +328,46 @@
       });
   }
 
-  calBtn.addEventListener("click", function () {
-    calBtn.disabled = true;
-    setCalStatus("正在获取权威时间…");
+  function applyNetworkTime(realBJ, manual) {
+    netBase = realBJ.getTime();
+    syncLocal = Date.now();
+    try {
+      localStorage.setItem("bjtime-netbase", String(netBase));
+      localStorage.setItem("bjtime-sync", String(syncLocal));
+    } catch (e) {}
+    render();
+    var diffSec = Math.round((netBase - syncLocal) / 1000);
+    var sign = diffSec < 0 ? -1 : 1;
+    var abs = Math.abs(diffSec);
+    var m = sign * Math.floor(abs / 60);
+    var s = sign * (abs % 60);
+    var absTxt = (Math.abs(m) ? Math.abs(m) + "分" : "") + (Math.abs(s) ? Math.abs(s) + "秒" : "") || "0秒";
+    setCalStatus((manual ? "已校准" : "已自动同步") + "：设备时钟约" + (diffSec >= 0 ? "慢 " : "快 ") + absTxt, "ok");
+  }
+
+  function syncFromNetwork(manual) {
+    setCalStatus(manual ? "正在校准…" : "正在同步网络时间…");
     fetchRealBeijing(function (err, realBJ) {
       calBtn.disabled = false;
       if (err || !realBJ) {
-        setCalStatus("校准失败：无法联网获取时间，请手动输入偏差", "err");
+        if (netBase == null) setCalStatus("无法获取网络时间，已用本机时钟（可能不准）", "err");
+        else setCalStatus("同步失败，仍使用上次网络时间", "err");
         return;
       }
-      applyCalibration(realBJ);
+      applyNetworkTime(realBJ, manual);
     });
+  }
+
+  calBtn.addEventListener("click", function () {
+    calBtn.disabled = true;
+    syncFromNetwork(true);
   });
 
-  // 立即渲染并对齐到整秒，避免跳动
+  // 立即渲染；自动联网同步一次，之后每 10 分钟重新同步
   render();
+  syncFromNetwork(false);
+  setInterval(function () { syncFromNetwork(false); }, 10 * 60 * 1000);
+
   function align() {
     var delay = 1000 - (Date.now() % 1000);
     setTimeout(function () {

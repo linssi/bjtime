@@ -280,6 +280,7 @@
       </div>
 
       <div class="alm-cd" id="almCountdown"></div>
+      <div class="alm-cd" id="almRemain"></div>
     </section>
   </main>
 
@@ -484,12 +485,13 @@
   var almJi = document.getElementById("almJi");
   var almChong = document.getElementById("almChong");
   var almCountdown = document.getElementById("almCountdown");
+  var almRemain = document.getElementById("almRemain");
   var almCalTitle = document.getElementById("almCalTitle");
   var almGrid = document.getElementById("almGrid");
   var almPrev = document.getElementById("almPrev");
   var almNext = document.getElementById("almNext");
   var almTodayBtn = document.getElementById("almTodayBtn");
-  var lastAlmKey = "", lastCdKey = "", todayKeyStr = "";
+  var lastAlmKey = "", lastCdKey = "", lastRemKey = "", todayKeyStr = "";
   var selKey = null;                 // 选中日期 "y-m-d"，null 表示今天
   var calViewY = null, calViewM = null;
 
@@ -587,6 +589,24 @@
       : "下一个节气：<b>" + best.name + "</b>（" + best.m + "月" + best.d + "日）· 还有 <b>" + days + "</b> 天";
   }
 
+  // 本月 / 本年剩余天数（按北京日期，含今天）
+  function updateRemain(bjEpoch) {
+    var bj = bjParts(bjEpoch);
+    var y = bj.Y, m = bj.Mo + 1, d = bj.D;
+    var key = y + "-" + m + "-" + d;
+    if (key === lastRemKey) return;
+    lastRemKey = key;
+    var daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    var leap = (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0);
+    var daysInYear = leap ? 366 : 365;
+    var dayOfYear = Math.floor((Date.UTC(y, m - 1, d) - Date.UTC(y, 0, 1)) / 86400000) + 1;
+    var restMonth = daysInMonth - d + 1;
+    var restYear = daysInYear - dayOfYear + 1;
+    var pct = (dayOfYear / daysInYear * 100).toFixed(1);
+    almRemain.innerHTML = "本月还剩 <b>" + restMonth + "</b> 天 · 本年还剩 <b>" + restYear + "</b> 天" +
+      "（本年已过 <b>" + pct + "%</b>）";
+  }
+
   function refreshAlmanac() {
     lastAlmKey = "";
     updateCalendar(currentBJEpoch());
@@ -648,6 +668,7 @@
     // 万年历（农历/节气/节日/宜忌）与节气倒计时，按北京日期更新
     updateCalendar(bjEpoch);
     updateCountdown(bjEpoch);
+    updateRemain(bjEpoch);
   }
 
   // ---- 联网获取权威北京时间 ----
